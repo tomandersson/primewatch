@@ -131,4 +131,30 @@ function listenToStream () {
     });
 }
 
+function listenToMyStream () {
+    console.log('Listen to me myself & I');
+    twit.stream("user", function (stream) {
+        // stream.on('end') // handle disconnect
+        // stream.on('destroy') // handle silent disconnect
+
+        stream.on('data', function (data) {
+            console.log('We got direct data!', data);
+            // TODO: DRY up
+            if (data.text.match(/(?:^| )\d{1,16}(?:\s+|\.\s+|$)/)) {
+                var number = Number(data.text.replace(/.*(?:^| )(\d{1,16})(?:\s+|\.\s+|$).*/, '$1')),
+                    isPrime = mathUtils.isPrime(number);
+
+                twit.updateStatus("@" + data.user.screen_name + " " + number + ". " + getStatus(isPrime),
+                    {"in_reply_to_status_id": data.id_str},
+                    function (err, retVal) {
+                        console.log('Response', err, retVal);
+                    }
+                );
+
+            }
+        });
+    });
+}
+
 listenToStream();
+listenToMyStream();
