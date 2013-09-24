@@ -67,20 +67,24 @@ var doUpdate = function (number, data) {
     if (isPrime || sendCount === sendCountTarget) {
         console.log(number + " will be tweeted (isPrime? " + isPrime + "): " + data.text);
 
-        /*twit.updateStatus("@" + data.user.screen_name + " " + number + ". " + getStatus(isPrime),
+        twit.updateStatus("@" + data.user.screen_name + " " + number + ". " + getStatus(isPrime),
             {"in_reply_to_status_id": data.id_str},
             function (err, retVal) {
                 if (!err && isPrime) {
                     db.put(number, data);
                 }
             }
-        );*/
+        );
         sendCount = sendCount < sendCountTarget ? sendCount + 1 : 0;
         if (!sendCount) {
             console.log("Updating sendCountTarget");
             sendCountTarget = getNewSendCount();
         }
+
+        return true;
     }
+
+    return false;
 };
 
 var getNewSendCount = function () {
@@ -102,20 +106,29 @@ process.on( 'SIGINT', function() {
     process.exit();
 });
 
-twit.stream('statuses/sample', function(stream) {
-    stream.on('data', function (data) {
-        if (data.text.match(/(?:^| )\d{1,16}(?:\s+|\.\s+|$)/)) {
-            var number = Number(data.text.replace(/.*(?:^| )(\d{1,16})(?:\s+|\.\s+|$).*/, '$1'));
+function listenToStream () {
+    console.log("Listening to stream, next false positive in " + sendCountTarget);
+    twit.stream('statuses/sample', function(stream) {
+        stream.on('data', function (data) {
+            if (data.text.match(/(?:^| )\d{1,16}(?:\s+|\.\s+|$)/)) {
+                var number = Number(data.text.replace(/.*(?:^| )(\d{1,16})(?:\s+|\.\s+|$).*/, '$1'));
 
-            if (number > 3) {
-                db.get(number, function (err, item) {
-                    if (err) {
-                        console.log("Error while getting item '" + number + "': " + err);
-                    } else if (!item) {
-                        doUpdate(number, data);
-                    }
-                });
+                if (number > 3) {
+                    db.get(number, function (err, item) {
+                        if (err) {
+                            console.log("Error while getting item '" + number + "': " + err);
+                        } else if (!item) {
+                            if (doUpdate(number, data)) {
+                                console.log("Found new prime: " + number);
+                                stream.destroy();
+                                setTimeout(listenToStream, 15 * 60000);
+                            }
+                        }
+                    });
+                }
             }
-        }
+        });
     });
-});
+}
+
+listenToStream();
