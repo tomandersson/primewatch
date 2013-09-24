@@ -133,15 +133,15 @@ function listenToStream () {
 
 function listenToMyStream () {
     console.log('Listen to me myself & I');
-    twit.stream("user", function (stream) {
+    twit.stream("user", {'with': 'user' }, function (stream) {
         // stream.on('end') // handle disconnect
         // stream.on('destroy') // handle silent disconnect
 
         stream.on('data', function (data) {
-            console.log('We got direct data!', data);
             // TODO: DRY up
-            if (data.text.match(/(?:^| )\d{1,16}(?:\s+|\.\s+|$)/)) {
-                var number = Number(data.text.replace(/.*(?:^| )(\d{1,16})(?:\s+|\.\s+|$).*/, '$1')),
+            if (data.text && data.user && data.user.screen_name !== '__primewatch' &&
+                    data.text.match(/.*\b(\d{1,16})\b.*$/)) {
+                var number = Number(data.text.replace(/.*\b(\d{1,16})\b.*$/, '$1')),
                     isPrime = mathUtils.isPrime(number);
 
                 twit.updateStatus("@" + data.user.screen_name + " " + number + ". " + getStatus(isPrime),
@@ -156,5 +156,5 @@ function listenToMyStream () {
     });
 }
 
-listenToStream();
+//listenToStream();
 listenToMyStream();
