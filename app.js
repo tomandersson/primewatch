@@ -156,5 +156,5 @@ function listenToMyStream () {
     });
 }
 
-//listenToStream();
+listenToStream();
 listenToMyStream();
