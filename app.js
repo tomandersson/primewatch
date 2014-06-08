@@ -5,100 +5,65 @@ var NTwitter = require('ntwitter'),
 
 nconf.use('file', { file: 'config.json' });
 
-       console.log('consumer secret is ' + nconf.get('consumerSecret'))
-
 var twit = new NTwitter({
-    consumer_key: nconf.get('consumerKey'),
-    consumer_secret: nconf.get('consumerSecret'),
-    access_token_key: nconf.get('accessTokenKey'),
-    access_token_secret: nconf.get('accessTokenSecret')
-});
+        consumer_key: nconf.get('consumerKey'),
+        consumer_secret: nconf.get('consumerSecret'),
+        access_token_key: nconf.get('accessTokenKey'),
+        access_token_secret: nconf.get('accessTokenSecret')
+    }),
+    timeout = nconf.get('tweetTimeout') || 2 * 60000;
 
 var statuses = [
         "That's prime!",
         "Thanks, that's a prime.",
-        "Prime material! *ba-dum-tisch*",
         "Primearama!",
         "Totally a prime number!",
         "Yeah, guess that's a prime number ..",
         "That one's a keeper.",
         "Ok, another prime, 'cool'.",
         "Cool, been looking for that one.",
-        "P-R-I-M-E!", "Mhm, thanks. Another prime.",
+        "P-R-I-M-E!",
         "Putting that on my list.",
         "That's a prime - thanks!",
         "Another one found -- grand!",
         "Neat, a prime!",
-        "Not _too_ chuffed, but I guess that counts as prime ..",
         "Prime.",
         "Yeah, prime.",
-        "You just posted a prime number.",
-        "You just posted a prime.",
-        "You just posted a prime - thanks!",
+        "Someone just posted a prime number.",
+        "Someone just posted a prime.",
+        "Someone just posted a prime - thanks!",
         "Found one!",
         "Found a prime.",
         "Prime spotted!",
-        "Here's another prime: 3."
-    ],
-    antiStatuses = [
-        "Sorry, that's not a prime.",
-        "Nice try, but not quite right.",
-        "Nah, don't want that one. Not a prime.",
-        "Hm, not having it; not prime enough.",
-        "Thanks, but I'll keep looking. For primes.",
-        "Looking for primes, that's not one. Thanks tho.",
-        "Not prime. No shame in trying though, I guess.",
-        "I'm more into primes, thanks. Like 3.",
-        "I'm more into primes, thanks. Like 5, or 7.",
-        "Close. Been looking for primes, you seen any?",
-        "Prime numbers only, please"
-    ],
-    sendCount = 0,
-    sendCountTarget;
+        "Here's another prime: 3.",
+        "More primes!",
+        "Getting closer to finding them all ..",
+        "Can't be that many left now!"
+    ];
 
-var getStatus = function (isPrime) {
-    return isPrime ? statuses[Math.floor(Math.random() * (statuses.length - 1))]
-        : antiStatuses[Math.floor(Math.random() * (antiStatuses.length - 1))];
+var getStatus = function () {
+    return statuses[Math.floor(Math.random() * (statuses.length - 1))];
 };
 
 var doUpdate = function (number, data) {
     var isPrime = mathUtils.isPrime(number);
 
-    if (isPrime || sendCount === sendCountTarget) {
-        console.log(number + " will be tweeted (isPrime? " + isPrime + "): " + data.text);
+    if (isPrime) {
+        console.log(number + " will be tweeted: " + data.text);
 
-        twit.updateStatus("@" + data.user.screen_name + " " + number + ". " + getStatus(isPrime),
-            {"in_reply_to_status_id": data.id_str},
-            function (err, retVal) {
+        twit.updateStatus(number + "! " + getStatus() + " #PrimeWatch \nhttp://twitter.com/#!" + data.user.id + "/status/" + data.id_str,
+            {},
+            function (err) {
                 if (!err && isPrime) {
                     db.put(number, data);
                 }
             }
         );
-        sendCount = sendCount < sendCountTarget ? sendCount + 1 : 0;
-        if (!sendCount) {
-            console.log("Updating sendCountTarget");
-            sendCountTarget = getNewSendCount();
-        }
 
-        return true;
     }
 
-    return false;
+    return isPrime;
 };
-
-var getNewSendCount = function () {
-    var count;
-
-    do {
-        count = Math.floor(Math.random() * (24 - 5 + 1)) + 5;
-    } while (!mathUtils.isPrime(count));
-
-    console.log("New sendCount is " + count)
-    return count;
-};
-
-sendCountTarget = getNewSendCount();
 
 process.on( 'SIGINT', function() {
     console.log("\nGracefully shutting down from  SIGINT (Crtl-C)");
@@ -107,7 +72,7 @@ process.on( 'SIGINT', function() {
 });
 
 function listenToStream () {
-    console.log("Listening to stream, next false positive in " + sendCountTarget);
+    console.log("Listening to stream");
     twit.stream('statuses/sample', function(stream) {
         stream.on('data', function (data) {
             if (data.text.match(/(?:^| )\d{1,16}(?:\s+|\.\s+|$)/)) {
@@ -121,7 +86,7 @@ function listenToStream () {
                             if (doUpdate(number, data)) {
                                 console.log("Found new prime: " + number);
                                 stream.destroy();
-                                setTimeout(listenToStream, 15 * 60000);
+                                setTimeout(listenToStream, timeout);
                             }
                         }
                     });
@@ -131,30 +96,4 @@ function listenToStream () {
     });
 }
 
-function listenToMyStream () {
-    console.log('Listen to me myself & I');
-    twit.stream("user", {'with': 'user' }, function (stream) {
-        // stream.on('end') // handle disconnect
-        // stream.on('destroy') // handle silent disconnect
-
-        stream.on('data', function (data) {
-            // TODO: DRY up
-            if (data.text && data.user && data.user.screen_name !== '__primewatch' &&
-                    data.text.match(/.*\b(\d{1,16})\b.*$/)) {
-                var number = Number(data.text.replace(/.*\b(\d{1,16})\b.*$/, '$1')),
-                    isPrime = mathUtils.isPrime(number);
-
-                twit.updateStatus("@" + data.user.screen_name + " " + number + ". " + getStatus(isPrime),
-                    {"in_reply_to_status_id": data.id_str},
-                    function (err, retVal) {
-                        console.log('Response', err, retVal);
-                    }
-                );
-
-            }
-        });
-    });
-}
-
 listenToStream();
-listenToMyStream();
