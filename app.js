@@ -75,7 +75,7 @@ function listenToStream () {
     console.log("Listening to stream");
     twit.stream('statuses/sample', function(stream) {
         stream.on('data', function (data) {
-            if (data.text.match(/(?:^| )\d{1,16}(?:\s+|\.\s+|$)/)) {
+            if (data.text && data.text.match(/(?:^| )\d{1,16}(?:\s+|\.\s+|$)/)) {
                 var number = Number(data.text.replace(/.*(?:^| )(\d{1,16})(?:\s+|\.\s+|$).*/, '$1'));
 
                 if (number > 3) {
