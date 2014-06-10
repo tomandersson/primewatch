@@ -56,6 +56,8 @@ var doUpdate = function (number, data) {
             function (err) {
                 if (!err && isPrime) {
                     db.put(number, data);
+                } else {
+                    console.error(err);
                 }
             }
         );
